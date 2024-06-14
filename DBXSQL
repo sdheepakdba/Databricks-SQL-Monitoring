@@ -1,685 +1,284 @@
-/**
- * @file FILEPATH: Untitled-1
- * @externallySharable
- * 
- * Guide for DBSQL System Tables
- * 
- * Jeremy Lewallen Sahib Grover Alex Pu
- * 
- * Last updated: Jun 12, 2024
- * 
- * The purpose of this guide is to help you, as a Databricks SQL Admin, better understand your warehouse usage and performance, helping you in efficient cost management, performance tuning, and effective resource allocation.
- * 
- * How to Use the Guide
- * This guide contains a series of SQL queries that allow you to extract specific data from the Warehouse Events System Table and the Query History System Table. Each query corresponds to a particular administrative task or question that you may wish to answer.
- * 
- * After each query description, you can create an alert based on the query results using the instructions provided. This can help you to proactively manage your warehouses.
- * 
- * If you haven’t enabled system tables, start here:
- * Monitor usage with system tables | Databricks on AWS
- * 
- * Alerts
- * Alerts are a powerful way to stay informed about changes in your warehouses. With alerts, you can receive notifications when certain conditions are met in your query results.
- * 
- * Follow these steps to create an alert based on a single column of a query:
- * 
- * 1. Find the target query that you want to alert on.
- * 2. Configure the alert in the Trigger condition field.
- * 3. Adjust alert settings and preview the alert to test whether it would trigger with the current data.
- * 4. Select how many notifications are sent when your alert is triggered.
- * 5. Choose a template for the alert notification.
- * 6. Save changes and set a refresh schedule for the alert.
- * 7. Click Create Alert and choose a notification destination. Remember, if you skip this step you will not be notified when the alert is triggered.
- * 
- * For the detailed step-by-step instructions, please refer to the linked alert guide.
- * 
- * Query Descriptions and Alerting Opportunities
- * 
- * Query 1: Resource Monitoring - Warehouses that are actively running and for how long
- * This query helps you understand which warehouses are currently active and their running time in hours.
- * 
- * ...
- * (Continued)
- */
-EXTERNALLY SHARABLE
+arkdown
+Copy code
+# Guide for DBSQL System Tables
 
-Guide for DBSQL System Tables
+### Jeremy Lewallen, Sahib Grover, Alex Pu
 
-Jeremy Lewallen Sahib Grover Alex Pu
+**Last updated: Jun 12, 2024**
 
-Last updated: Jun 12, 2024
+---
 
+The purpose of this guide is to help you, as a Databricks SQL Admin, better understand your warehouse usage and performance, aiding in efficient cost management, performance tuning, and effective resource allocation.
 
-The purpose of this guide is to help you, as a Databricks SQL Admin, better understand your warehouse usage and performance, helping you in efficient cost management, performance tuning, and effective resource allocation.
+## How to Use the Guide
 
-How to Use the Guide
 This guide contains a series of SQL queries that allow you to extract specific data from the Warehouse Events System Table and the Query History System Table. Each query corresponds to a particular administrative task or question that you may wish to answer.
 
+After each query description, you can create an alert based on the query results using the instructions provided. This can help you proactively manage your warehouses.
 
-After each query description, you can create an alert based on the query results using the instructions provided. This can help you to proactively manage your warehouses.
+### Enabling System Tables
 
-If you haven’t enabled system tables, start here:
-Monitor usage with system tables | Databricks on AWS
-Alerts
+If you haven’t enabled system tables, start here: [Monitor usage with system tables | Databricks on AWS](https://docs.databricks.com/administration-guide/account-settings/system-tables.html).
+
+### Alerts
+
 Alerts are a powerful way to stay informed about changes in your warehouses. With alerts, you can receive notifications when certain conditions are met in your query results.
 
+#### Steps to Create an Alert
 
-Follow these steps to create an alert based on a single column of a query:
+1. **Find the target query** that you want to alert on.
+2. **Configure the alert** in the Trigger condition field.
+3. **Adjust alert settings** and preview the alert to test whether it would trigger with the current data.
+4. **Select notification preferences** for when your alert is triggered.
+5. **Choose a template** for the alert notification.
+6. **Save changes** and set a refresh schedule for the alert.
+7. **Click Create Alert** and choose a notification destination. Remember, if you skip this step, you will not be notified when the alert is triggered.
 
+For detailed step-by-step instructions, please refer to the [linked alert guide](https://docs.databricks.com/sql/admin/alerts.html).
 
-First, find the target query that you want to alert on.
-Configure the alert in the Trigger condition field.
-Adjust alert settings and preview the alert to test whether it would trigger with the current data.
-Select how many notifications are sent when your alert is triggered.
-Choose a template for the alert notification.
-Save changes and set a refresh schedule for the alert.
-Click Create Alert and choose a notification destination. Remember, if you skip this step you will not be notified when the alert is triggered.
+## Query Descriptions and Alerting Opportunities
 
-For the detailed step-by-step instructions, please refer to the linked alert guide.
+### Query 1: Resource Monitoring - Warehouses that are actively running and for how long
 
-Query Descriptions and Alerting Opportunities
-Query 1: Resource Monitoring - Warehouses that are actively running and for how long
 This query helps you understand which warehouses are currently active and their running time in hours.
 
-
-use catalog `system`;
-
+```sql
+USE CATALOG `system`;
 
 SELECT
-
     we.warehouse_id,
-
     we.event_time,
-
     TIMESTAMPDIFF(MINUTE, we.event_time, CURRENT_TIMESTAMP()) / 60.0 AS running_hours,
-
     we.cluster_count
-
 FROM
-
     compute.warehouse_events we
-
 WHERE
-
     we.event_type = 'RUNNING'
-
     AND NOT EXISTS (
-
         SELECT
-
             1
-
         FROM
-
             compute.warehouse_events we2
-
         WHERE
-
             we2.warehouse_id = we.warehouse_id
-
             AND we2.event_time > we.event_time
-
     )
-
-
-
-
-Alerting Opportunity: As a DBSQL Admin, you might want to be alerted if a warehouse is running longer than expected. You can use the query results to set an alert condition such as triggering an alert when the running hours exceed a certain threshold.
+Alerting Opportunity: Set an alert if a warehouse is running longer than expected. Trigger an alert when the running hours exceed a certain threshold.
 
 Query 2: Resource Monitoring - Warehouses that are upscaled longer than expected
 This query identifies warehouses that have scaled up (increased in cluster count) and have remained in that state longer than usual.
 
-
-use catalog `system`;
-
+sql
+Copy code
+USE CATALOG `system`;
 
 SELECT
-
    we.warehouse_id,
-
    we.event_time,
-
    TIMESTAMPDIFF(MINUTE, we.event_time, CURRENT_TIMESTAMP()) / 60.0 AS upscaled_hours,
-
    we.cluster_count
-
 FROM
-
    compute.warehouse_events we
-
 WHERE
-
    we.event_type = 'SCALED_UP'
-
    AND we.cluster_count >= 2
-
    AND NOT EXISTS (
-
        SELECT 1
-
        FROM compute.warehouse_events we2
-
        WHERE we2.warehouse_id = we.warehouse_id
-
        AND (
-
            (we2.event_type = 'SCALED_DOWN') OR 
-
            (we2.event_type = 'SCALED_UP' AND we2.cluster_count < 2)
-
        )
-
        AND we2.event_time > we.event_time
-
    )
-
-
-
-Alerting Opportunity: Alerting on this condition can help you monitor resources and cost. You could set an alert when the upscaled hours exceed a certain limit.
+Alerting Opportunity: Alert when upscaled hours exceed a set limit to monitor resources and costs.
 
 Query 3: Warehouses that start and have never started before
 This query informs you about new warehouses that are starting for the first time.
 
-
-use catalog `system`;
-
+sql
+Copy code
+USE CATALOG `system`;
 
 SELECT
-
    we.warehouse_id,
-
    we.event_time,
-
    we.cluster_count
-
 FROM
-
    compute.warehouse_events we
-
 WHERE
-
    (we.event_type = 'STARTING' OR we.event_type = 'RUNNING')
-
    AND NOT EXISTS (
-
        SELECT 1
-
        FROM compute.warehouse_events we2
-
        WHERE we2.warehouse_id = we.warehouse_id
-
        AND we2.event_time < we.event_time
-
    )
-
-
-
-Alerting Opportunity: Alerting on new warehouses can help track resource allocation. You could set an alert whenever a new warehouse is detected.
-
+Alerting Opportunity: Set an alert for new warehouses to track resource allocation.
 
 Query 4: What caused billing charges for the month?
-Think of this query like a receipt for your monthly charges.  If you want to understand specifically what the warehouse was doing to generate charges, then this query can tell you the exact dates and times that scaling up/down and started/stopped occurred.
+This query provides a detailed receipt of your monthly charges, including scaling up/down and start/stop events.
 
-
-use catalog `system`;
-
+sql
+Copy code
+USE CATALOG `system`;
 
 SELECT
-
     we.warehouse_id AS warehouse_id,
-
     we.event_type AS event,
-
     we.event_time AS event_time,
-
     we.cluster_count AS cluster_count
-
 FROM
-
     compute.warehouse_events AS we
-
 WHERE
-
     we.event_type IN (
-
         'STARTING', 'RUNNING', 'STOPPING', 'STOPPED',
-
         'SCALING_UP', 'SCALED_UP', 'SCALING_DOWN', 'SCALED_DOWN'
-
     )
-
     AND MONTH(we.event_time) = 7
-
     AND YEAR(we.event_time) = YEAR(CURRENT_DATE())
-
     AND we.warehouse_id = '19c9d68652189278'
-
 ORDER BY
-
     event_time DESC
-
-
-
 Query 5: Which warehouses haven't been used in the last 30 days
 This query helps you identify unused resources, providing an opportunity for cost optimization.
 
-
-use catalog `system`;
-
+sql
+Copy code
+USE CATALOG `system`;
 
 SELECT 
-
     we.warehouse_id,
-
     we.event_time,
-
     we.event_type,
-
     we.cluster_count
-
 FROM 
-
     compute.warehouse_events AS we
-
 WHERE 
-
     we.warehouse_id IN (
-
         SELECT DISTINCT 
-
             warehouse_id
-
         FROM 
-
             compute.warehouse_events
-
         WHERE
-
             MONTH(event_time) = 6
-
             AND YEAR(event_time) = YEAR(CURRENT_DATE())
-
     )
-
     AND we.warehouse_id NOT IN (
-
         SELECT DISTINCT 
-
             warehouse_id
-
         FROM 
-
             compute.warehouse_events
-
         WHERE
-
             MONTH(event_time) = 7
-
             AND YEAR(event_time) = YEAR(CURRENT_DATE())
-
     )
-
 ORDER BY
-
     event_time DESC
-
-
-
-Alerting Opportunity: Receiving an alert on unused resources could help optimize costs. You could set an alert when the query detects any unused warehouses.
-
+Alerting Opportunity: Set an alert when the query detects unused warehouses to optimize costs.
 
 Query 6: Warehouses with the most uptime in July
 This query shows which warehouses have been used the most during a specific month.
 
-
-use system.compute;
+sql
+Copy code
+USE system.compute;
 
 WITH StartEvents AS (
-
     SELECT
-
         warehouse_id,
-
         event_time AS start_time
-
     FROM compute.warehouse_events
-
     WHERE event_type = 'STARTING'
-
 ),
-
-
 StopEvents AS (
-
     SELECT
-
         warehouse_id,
-
         event_time AS stop_time
-
     FROM compute.warehouse_events
-
     WHERE event_type = 'STOPPED'
-
 ),
-
-
 JoinedEvents AS (
-
     SELECT
-
         s.warehouse_id,
-
         s.start_time,
-
         MIN(e.stop_time) AS first_stop_after_start
-
     FROM StartEvents s
-
     JOIN StopEvents e ON s.warehouse_id = e.warehouse_id AND e.stop_time > s.start_time
-
     GROUP BY s.warehouse_id, s.start_time
-
 )
-
-
 SELECT
-
     DATE(JoinedEvents.start_time) AS date,
-
     JoinedEvents.warehouse_id,
-
     SUM(TIMESTAMPDIFF(MINUTE, JoinedEvents.start_time, JoinedEvents.first_stop_after_start)) / 60.0 AS uptime_hours
-
 FROM JoinedEvents
-
 GROUP BY DATE(JoinedEvents.start_time), JoinedEvents.warehouse_id
-
 ORDER BY date, uptime_hours DESC;
-
-
-
-Alerting Opportunity: You might want to keep track of high-utilization warehouses. An alert could be set when the uptime hours for a warehouse exceed a specific threshold.
-
+Alerting Opportunity: Track high-utilization warehouses and set an alert when uptime hours exceed a specific threshold.
 
 Query 7: Warehouses that spent the most time upscaled in July
 This query informs you about warehouses that have spent significant time in the upscaled state.
 
-
-use catalog `system`;
-
+sql
+Copy code
+USE CATALOG `system`;
 
 SELECT
-
    warehouse_id,
-
    SUM(TIMESTAMPDIFF(MINUTE, upscaled_time, downscaled_time)) / 60.0 AS upscaled_hours
-
 FROM (
-
    SELECT
-
       upscaled.warehouse_id,
-
       upscaled.event_time AS upscaled_time,
-
       (
-
          SELECT 
-
             MIN(downscaled.event_time)
-
          FROM 
-
             compute.warehouse_events AS downscaled
-
          WHERE
-
             downscaled.warehouse_id = upscaled.warehouse_id
-
             AND (downscaled.event_type = 'SCALED_DOWN' OR downscaled.event_type = 'STOPPED')
-
             AND downscaled.event_time > upscaled.event_time
-
       ) AS downscaled_time
-
    FROM
-
       compute.warehouse_events AS upscaled
-
    WHERE
-
       upscaled.event_type = 'SCALED_UP'
-
       AND upscaled.cluster_count >= 2
-
       AND MONTH(upscaled.event_time) = 7
-
       AND YEAR(upscaled.event_time) = YEAR(CURRENT_DATE())
-
 ) AS warehouse_upscaled
-
 WHERE
-
    downscaled_time IS NOT NULL
-
 GROUP BY
-
    warehouse_id
-
 ORDER BY
+   upscaled_hours DESC;
+Alerting Opportunity: Manage performance and cost by setting an alert when upscaled hours exceed a certain limit.
 
-   upscaled_hours DESC limit 0;
+Query 8: Uptime by date and warehouse ID
+This query informs you about the total minutes that warehouses were up by date. It can be used as a base for forecasting.
 
-
-
-Alerting Opportunity: Knowing when your warehouses are upscaled for long periods can help manage performance and cost. An alert could be set when the upscaled hours exceed a certain limit.
-
-
-Query 8: Uptime by date and warehouse id
-This query informs you about the total minutes that warehouses were up by date.  This query can be used as the base for forecasting.
-
-
-use system.compute;
-
+sql
+Copy code
+USE system.compute;
 
 WITH StartEvents AS (
-
     SELECT
-
         warehouse_id,
-
         event_time AS start_time
-
     FROM compute.warehouse_events
-
     WHERE event_type = 'STARTING'
 
-),
 
 
-StopEvents AS (
 
-    SELECT
 
-        warehouse_id,
 
-        event_time AS stop_time
 
-    FROM compute.warehouse_events
+Continue generating
 
-    WHERE event_type = 'STOPPED'
 
-),
 
-
-JoinedEvents AS (
-
-    SELECT
-
-        s.warehouse_id,
-
-        s.start_time,
-
-        MIN(e.stop_time) AS first_stop_after_start
-
-    FROM StartEvents s
-
-    JOIN StopEvents e ON s.warehouse_id = e.warehouse_id AND e.stop_time > s.start_time
-
-    GROUP BY s.warehouse_id, s.start_time
-
-)
-
-
-SELECT
-
-    DATE(JoinedEvents.start_time) AS date,
-
-    JoinedEvents.warehouse_id,
-
-    SUM(TIMESTAMPDIFF(MINUTE, JoinedEvents.start_time, JoinedEvents.first_stop_after_start)) / 60.0 AS uptime_hours
-
-FROM JoinedEvents
-
-GROUP BY DATE(JoinedEvents.start_time), JoinedEvents.warehouse_id
-
-ORDER BY date, uptime_hours DESC;
-
-
-
-
-Query 9 - When would increasing t-shirt size for a warehouse lead to better performance?
-This query is looking for disk spill, which is one of the best indicators for the need to increase t-shirt size on a warehouse.  If you notice a warehouse is spilling to disk often, this means that the higher speed memory on the warehouse is full and the warehouse is having to write to disk (slower and less efficient).
-
-
-select
-
-  warehouse_id,
-
-  statement_id,
-
-  statement_text,
-
-  sum(spilled_local_bytes) as spilled_local_bytes
-
-from system.query.history
-
-where start_time between date_sub(CURRENT_DATE, 30) and CURRENT_DATE
-
-group by warehouse_id, statement_id, statement_text
-
-having spilled_local_bytes > 0
-
-order by spilled_local_bytes desc;
-
-
-
-
-
-Query 10 - Suspects for inefficiency
-Queries that have large amounts of shuffle are a good place to look for inefficiently written queries or table structure.  
-
-
-
-
-select warehouse_id, statement_id, sum(shuffle_read_bytes) as shuffle_read_bytes
-
-from `system`.`query`.`history`
-
-where start_time between '2023-10-01' and '2023-10-31'
-
-group by all
-
-having shuffle_read_bytes >0
-
-order by 3 desc;
-
-
-
-
-
-
-Query 12 - Cost per query
-
-
-
-DECLARE OR REPLACE VARIABLE dbu_price FLOAT DEFAULT 0.55;
-
--- t_shirt_size is the amount of DBUs emmitted per hour for a warehouse tshirt size (per cluster)
-
-DECLARE OR REPLACE VARIABLE t_shirt_size INT DEFAULT 4;
-
-
-SELECT 
-
-    total_duration_ms / 3600000 * dbu_price * t_shirt_size * (
-
-        SELECT cluster_count 
-
-        FROM system.compute.warehouse_events 
-
-        WHERE warehouse_events.warehouse_id = system.query.history.warehouse_id 
-
-        AND warehouse_events.event_time <= system.query.history.start_time
-
-        ORDER BY warehouse_events.event_time DESC 
-
-        LIMIT 1
-
-    ) AS total_cost
-
-FROM system.query.history;
-
-
-
-
-Query 13 - Check for Tags on Warehouses
-This query will check for a “cost center” tag for each warehouse that is emitting DBUs to the billing table.  
-
-
-select usage_metadata['warehouse_id']
-
-from system.billing.usage
-
-where (custom_tags['cost-center] is NULL) and sku_name LIKE '%SQL%' and usage_date >= date_sub(now(), 30)
-
-
-Query 14 - Monitor Warehouse Latency
-To know what your end user is experiencing, use the wall clock latency metrics to see percentile shifts from median to extremes in user experience
-
-
-with bronze as (
-
-SELECT
-
- date(start_time) as date, warehouse_id, coalesce(TIMESTAMPDIFF(MILLISECOND, start_time, end_time)/1000, 0) as wall_clock_time
-
-FROM
-
- `system`.`query`.`history`
-
- where start_time >= date_sub(now(), 60)
-
- )
-
-
- select date, warehouse_id, percentile(wall_clock_time, .5) as p50_latency, percentile(wall_clock_time, .75) as p75_latency, percentile(wall_clock_time, .95) as p95_latency, percentile(wall_clock_time, .99) as p99_latency
-
- from bronze
-
- group by 1, 2;
-
-Query 15 - Query Pattern Changes
-
-select date(start_time), count(*) as daily_queries
-
-from `system`.`query`.`history`
-
-group by all;
-
-
-
-
-Definitions
-Scaled Up Event → When the cluster is usable
+ChatGPT can make m
